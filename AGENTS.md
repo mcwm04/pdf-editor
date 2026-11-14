@@ -1,6 +1,6 @@
 # AGENTS.md — PDF Editor
 
-Instructions for coding agents (OpenAI Codex, Claude Code and others) working in this repository.
+Instructions for coding agents (Claude Code and others) working in this repository. Claude Code loads this file through `CLAUDE.md`.
 
 ## What this is
 A private PDF editor that runs entirely on the user's device. One TypeScript codebase ships as:
@@ -21,7 +21,7 @@ Owner: Waqas Ahmad (TEKDIGIX). Users are students, teachers and office staff in 
 | Desktop (local only) | `cd desktop && npm ci && npm start` |
 | Windows installer | `cd desktop && npm run dist:win` (run on Windows) |
 
-Test dependencies: `pip install -r tests/requirements.txt && python3 -m playwright install --with-deps chromium`. In Codex cloud, `scripts/codex-setup.sh` does all of this.
+Test dependencies: `bash scripts/setup.sh` installs everything (npm packages, Python test tools, a Chromium for the tests) and builds. Use it as the Setup script of a Claude Code cloud environment.
 
 **Before finishing any change:** `npm run typecheck` must be clean and `npm test` must print `ALL TESTS PASSED`. Add or extend a test in `tests/` for every new feature or bug fix.
 

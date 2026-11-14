@@ -1,10 +1,10 @@
 import asyncio
 from playwright.async_api import async_playwright
-from paths import APP, FIX, OUT
+from paths import APP, FIX, OUT, LAUNCH
 OUT = str(OUT)
 async def main():
     async with async_playwright() as p:
-        b = await p.chromium.launch(); ctx = await b.new_context(viewport={"width":1440,"height":900}, accept_downloads=True); page = await ctx.new_page()
+        b = await p.chromium.launch(**LAUNCH); ctx = await b.new_context(viewport={"width":1440,"height":900}, accept_downloads=True); page = await ctx.new_page()
         errs=[]; page.on("pageerror", lambda e: errs.append(str(e)))
         await page.goto(APP)
         async with page.expect_file_chooser() as fc: await page.get_by_role("button", name="Open PDF").click()

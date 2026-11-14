@@ -1,5 +1,8 @@
 # Build notes / changelog
 
+## Repository setup (2026-11-14)
+- Hosted at github.com/mcwm04/pdf-editor for Claude Code: `CLAUDE.md` imports `AGENTS.md`; `scripts/setup.sh` is the cloud environment setup script; `.claude/settings.json` SessionStart hook keeps `node_modules` in sync in cloud sessions; GitHub Actions runs the tests on every push.
+
 ## v1.2 — Edit PDF mode (2026-11-14)
 - "Edit PDF" tool (key X): select existing text segments, images/forms and shapes; drag to move, corner to resize (images/shapes), Delete removes, double-click/Enter changes a text line.
 - Engine in `src/core/content/`: content-stream lexer, interpreter (graphics + text state, font widths, ToUnicode decode/re-encode), rewriter.

@@ -2,7 +2,7 @@ import asyncio, sys, os, zipfile, io
 from playwright.async_api import async_playwright
 from pypdf import PdfReader
 
-from paths import APP, FIX, OUT
+from paths import APP, FIX, OUT, LAUNCH
 T = str(FIX); OUT = str(OUT)
 errors = []
 
@@ -18,7 +18,7 @@ async def ann_count(page):
 
 async def main():
     async with async_playwright() as p:
-        b = await p.chromium.launch()
+        b = await p.chromium.launch(**LAUNCH)
         ctx = await b.new_context(viewport={"width": 1440, "height": 900}, accept_downloads=True)
         page = await ctx.new_page()
         page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
