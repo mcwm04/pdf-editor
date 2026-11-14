@@ -3,3 +3,4 @@ dist/
 desktop/node_modules/
 desktop/app/
 desktop/dist/
+tests/out/

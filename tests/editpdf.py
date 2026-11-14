@@ -1,6 +1,7 @@
 import asyncio, json
 from playwright.async_api import async_playwright
-OUT = "/home/claude/test/out"; T = "/home/claude/test"
+from paths import APP, FIX, OUT
+T = str(FIX); OUT = str(OUT)
 errs = []
 async def openfile(page, f, first=False):
     if first:
@@ -30,7 +31,7 @@ async def main():
         page = await ctx.new_page()
         page.on("console", lambda m: errs.append(m.text) if m.type == "error" else None)
         page.on("pageerror", lambda e: errs.append(str(e)))
-        await page.goto("file:///home/claude/pdf-editor/dist/index.html")
+        await page.goto(APP)
         # ---------- LibreOffice / Word PDF ----------
         await openfile(page, "doc.pdf", first=True)
         await page.keyboard.press("x"); await page.wait_for_timeout(500)
@@ -86,4 +87,15 @@ async def main():
         await page.screenshot(path=f"{OUT}/e4-rotated.png")
         print("errors:", errs)
         await b.close()
+    # Verify the saved files: replaced/deleted text must really be gone.
+    import pypdfium2 as pdfium
+    def text(f): return pdfium.PdfDocument(f"{OUT}/{f}")[0].get_textpage().get_text_range()
+    t = text("doc-edited.pdf")
+    assert "Waqas" not in t and "Ali Raza" in t and "Quarterly Report 2026" in t and "Italic closing" not in t, t
+    t = text("chrome-edited.pdf")
+    assert "50,000" in t and "45,000" not in t, t
+    t = text("sample-urdu-edit.pdf")
+    assert "Line 1:" not in t and "اردو" in t, t
+    assert not errs, errs
+    print("EDIT PDF TESTS PASSED")
 asyncio.run(main())

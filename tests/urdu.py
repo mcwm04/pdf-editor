@@ -1,16 +1,17 @@
 import asyncio, os
 from playwright.async_api import async_playwright
-OUT = "/home/claude/test/out"
+from paths import APP, FIX, OUT
+OUT = str(OUT)
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(); ctx = await b.new_context(viewport={"width":1440,"height":900}, accept_downloads=True)
         page = await ctx.new_page(); errs=[]
         page.on("console", lambda m: errs.append(m.text) if m.type in ("error","warning") else None)
         page.on("pageerror", lambda e: errs.append(str(e)))
-        await page.goto("file:///home/claude/pdf-editor/dist/index.html")
+        await page.goto(APP)
         async with page.expect_file_chooser() as fc:
             await page.get_by_role("button", name="Open PDF").click()
-        await (await fc.value).set_files("/home/claude/test/sample.pdf")
+        await (await fc.value).set_files(str(FIX / "sample.pdf"))
         await page.wait_for_function("window.__pdfEditor.store.pages.length === 3")
         bx = await page.locator(".page-wrap").first.bounding_box()
         # 1: Urdu typed into default (Helvetica) box, with an English/number second line

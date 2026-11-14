@@ -1,17 +1,17 @@
 {
   "name": "pdf-editor",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "version": "1.2.0",
+  "description": "Private PDF editor (web + desktop): annotate, sign, Urdu text, edit existing PDF content, merge/split",
   "scripts": {
     "dev": "vite",
     "build": "vite build && node scripts/escape-replacement-char.js",
     "preview": "vite preview",
-    "desktop": "npm run build && cd desktop && npm start"
+    "desktop": "npm run build && cd desktop && npm start",
+    "test": "bash tests/run_all.sh",
+    "typecheck": "tsc --noEmit -p ."
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Waqas Ahmad (TEKDIGIX)",
+  "license": "UNLICENSED",
   "devDependencies": {
     "typescript": "^7.0.2",
     "vite": "^5.4.21",
@@ -25,5 +25,9 @@
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^4.10.38"
   },
-  "type": "module"
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "private": true
 }

@@ -1,7 +1,7 @@
 {
   "name": "pdf-editor-desktop",
   "productName": "PDF Editor",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Private PDF editor for Windows, macOS and Linux",
   "author": "TEKDIGIX",
   "main": "main.js",

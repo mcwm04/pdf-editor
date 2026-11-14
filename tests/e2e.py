@@ -2,9 +2,8 @@ import asyncio, sys, os, zipfile, io
 from playwright.async_api import async_playwright
 from pypdf import PdfReader
 
-APP = "file:///home/claude/pdf-editor/dist/index.html"
-T = "/home/claude/test"
-OUT = f"{T}/out"; os.makedirs(OUT, exist_ok=True)
+from paths import APP, FIX, OUT
+T = str(FIX); OUT = str(OUT)
 errors = []
 
 async def page_box(page, idx):
