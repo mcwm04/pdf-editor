@@ -4,6 +4,7 @@ import { drawOrder, Annotation, Asset, DocStore, PageRef, TextAnn, BoxAnn, LineA
 import { renderPage, editsKey } from '../core/render';
 import { EditMode } from './editmode';
 import { arrowHead } from '../core/export';
+import { updateUrduKeyboard, endUrduKeyboard } from './urdukeyboard';
 import { FONT_CSS, METRICS, effectiveFont, isUrduFont, isRtlText, hasArabicScript } from '../core/fonts';
 export { FONT_CSS };
 
@@ -142,7 +143,7 @@ export class Viewer {
       if (v.visible) this.paint(v);
     });
     if (this.selectedId && !this.store.findAnn(this.selectedId)) this.selectedId = null;
-    if (this.editor && !this.views.has(this.editor.v.page.id)) this.editor = null;
+    if (this.editor && !this.views.has(this.editor.v.page.id)) { this.editor = null; endUrduKeyboard(); }
     this.current = Math.min(this.current, Math.max(0, pages.length - 1));
     this.root.classList.toggle('has-doc', pages.length > 0);
     this.onChange();
@@ -413,11 +414,14 @@ export class Viewer {
     const fo = s('foreignObject', { x: ann.x, y: ann.y, width: 10, height: 10 });
     const ta = document.createElement('textarea');
     ta.className = 'text-editor';
-    ta.value = ann.text; ta.spellcheck = true; ta.dir = 'auto'; ta.setAttribute('aria-label', 'Text');
+    ta.value = ann.text; ta.spellcheck = true; ta.dir = ann.text || !isUrduFont(ann.font) ? 'auto' : 'rtl'; ta.setAttribute('aria-label', 'Text');
     const pad = () => ann.size + 6;
     const fit = () => {
       const text = ta.value || ' ';
-      const font = effectiveFont(ann.font, text), m = METRICS[font], rtl = isRtlText(text);
+      const font = effectiveFont(ann.font, text), m = METRICS[font];
+      // An empty box in an Urdu font is already right-to-left, so the caret starts at the right.
+      const rtl = isRtlText(text) || (!ta.value && isUrduFont(ann.font));
+      ta.dir = ta.value || !isUrduFont(ann.font) ? 'auto' : 'rtl';
       Object.assign(ta.style, {
         fontFamily: FONT_CSS[font], fontSize: `${ann.size}px`, lineHeight: String(m.lh), color: ann.color,
         fontWeight: ann.bold ? '700' : '400', fontStyle: ann.italic && !isUrduFont(font) ? 'italic' : 'normal',
@@ -431,6 +435,7 @@ export class Viewer {
       fo.setAttribute('y', String(ann.y - ann.size * (m.editor - m.base) - 1));
       fo.setAttribute('width', String(w + 4));
       fo.setAttribute('height', String(mm.h + ann.size * 2));
+      updateUrduKeyboard(ta, isUrduFont(font));
     };
     ta.addEventListener('input', () => {
       // Typing Urdu into a Latin-font box switches the box (and the next ones) to the Urdu font.
@@ -466,6 +471,7 @@ export class Viewer {
   commitText() {
     const ed = this.editor; if (!ed) return;
     this.editor = null;
+    endUrduKeyboard();
     ed.fo.remove();
     const text = ed.ta.value.replace(/\s+$/, '');
     const pageId = ed.v.page.id;

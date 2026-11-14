@@ -145,3 +145,17 @@ p { margin: 0; line-height: 1.5; }
 .edit-lift { fill: #fff; fill-opacity: .85; pointer-events: none; }
 .obj-text-editor { display: block; box-sizing: border-box; border: 1.5px solid var(--accent); background: #fff; padding: 2px; margin: 0; outline: none; border-radius: 2px; box-shadow: 0 2px 10px rgb(0 0 0 / .15); }
 .tool-btn.edit-pdf.active { background: #fef3c7; color: #92400e; }
+
+/* On-screen Urdu keyboard */
+.urdu-kb { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); width: min(640px, 96vw); z-index: 50; background: var(--panel);
+  border: 1px solid var(--line-2); border-radius: 12px; box-shadow: var(--shadow), 0 8px 28px rgb(0 0 0 / .18); padding: 8px; display: grid; gap: 5px; user-select: none; }
+.urdu-kb .uhead { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--muted); padding: 0 4px 2px; }
+.urdu-kb .urow { display: flex; gap: 5px; justify-content: center; }
+.urdu-kb .ukey { flex: 1 1 0; min-width: 0; height: 40px; border: 1px solid var(--line-2); border-radius: 7px; background: #fff; font-size: 22px; line-height: 1;
+  font-family: "PE Noto Naskh Arabic", "Segoe UI", sans-serif; padding: 0; }
+.urdu-kb .ukey:hover { background: var(--accent-soft); }
+.urdu-kb .ukey:active { background: #e0e7ff; }
+.urdu-kb .ukey.wide { flex: 1.8 1 0; font-size: 14px; }
+.urdu-kb .ukey.space { flex: 4 1 0; font-size: 14px; }
+.urdu-kb .ukey.close { flex: 0 0 28px; height: 24px; font-size: 18px; border: 0; background: transparent; }
+@media (max-width: 520px) { .urdu-kb .ukey { height: 36px; font-size: 19px; } }
