@@ -4,7 +4,7 @@ A private PDF editor that runs fully on the user's device. One codebase ships as
 
 ## Features (v1)
 - Open, view, zoom, page thumbnails, drag-and-drop files
-- Add text (font, size, colour, bold/italic), highlight, freehand draw, rectangle, ellipse, line, arrow, whiteout
+- Add text (font, size, colour, bold/italic; the font list also shows the fonts already used in the open PDF), highlight, freehand draw, rectangle, ellipse, line, arrow, whiteout
 - Insert images; signatures (draw, type or upload), saved for reuse
 - Select, move, resize, restyle, delete; undo/redo (200 steps)
 - Pages: add blank, rotate, delete, drag to reorder, insert pages from another PDF

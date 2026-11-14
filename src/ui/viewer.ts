@@ -8,7 +8,7 @@ import { FONT_CSS, METRICS, effectiveFont, isUrduFont, isRtlText, hasArabicScrip
 export { FONT_CSS };
 
 export type Tool = 'select' | 'edit' | 'text' | 'highlight' | 'pen' | 'rect' | 'ellipse' | 'line' | 'arrow' | 'whiteout';
-export interface Style { color: string; width: number; size: number; font: FontName; bold: boolean; italic: boolean; opacity: number }
+export interface Style { color: string; width: number; size: number; font: FontName; fontLabel?: string; bold: boolean; italic: boolean; opacity: number }
 
 
 const base: Style = { color: '#1f2937', width: 2, size: 14, font: 'Helvetica', bold: false, italic: false, opacity: 1 };
@@ -313,7 +313,7 @@ export class Viewer {
       if (hit && hit.type === 'text') { this.openEditor(v, hit, false); return; }
       if (hadEditor) return; // first click outside only closes the open editor
       const st = this.styles.text;
-      const ann: TextAnn = { id: uid('a'), type: 'text', x: p.x, y: p.y - st.size * 0.6, w: 0, h: 0, text: '', font: st.font, size: st.size, color: st.color, bold: st.bold, italic: st.italic };
+      const ann: TextAnn = { id: uid('a'), type: 'text', x: p.x, y: p.y - st.size * 0.6, w: 0, h: 0, text: '', font: st.font, fontLabel: st.fontLabel, size: st.size, color: st.color, bold: st.bold, italic: st.italic };
       this.openEditor(v, ann, true);
       return;
     }
@@ -435,7 +435,7 @@ export class Viewer {
     ta.addEventListener('input', () => {
       // Typing Urdu into a Latin-font box switches the box (and the next ones) to the Urdu font.
       if (!isUrduFont(ann.font) && hasArabicScript(ta.value)) {
-        ann.font = 'Nastaliq'; this.styles.text.font = 'Nastaliq'; this.onChange();
+        ann.font = 'Nastaliq'; ann.fontLabel = undefined; this.styles.text.font = 'Nastaliq'; this.styles.text.fontLabel = undefined; this.onChange();
       }
       fit();
     });
@@ -482,7 +482,7 @@ export class Viewer {
       } else this.drawOverlay(ed.v);
     } else {
       const before = this.store.findAnn(ed.ann.id)?.ann as TextAnn | undefined;
-      const styleChanged = before && (['font', 'size', 'color', 'bold', 'italic'] as const).some(k => before[k] !== ed.ann[k]);
+      const styleChanged = before && (['font', 'fontLabel', 'size', 'color', 'bold', 'italic'] as const).some(k => before[k] !== ed.ann[k]);
       if (before && (text !== before.text || styleChanged)) {
         this.store.apply(pages => {
           const page = pages.find(p => p.id === pageId)!;
@@ -513,7 +513,7 @@ export class Viewer {
     this.store.apply(() => {
       const f = this.store.findAnn(id); if (!f) return;
       const a: any = f.ann;
-      for (const [k, v] of Object.entries(patch)) if (k in a) a[k] = v;
+      for (const [k, v] of Object.entries(patch)) if (k in a || k === 'fontLabel') a[k] = v;
       if (a.type === 'text') Object.assign(a, measureText(a));
     });
   }

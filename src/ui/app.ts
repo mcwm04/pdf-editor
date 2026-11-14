@@ -1,11 +1,12 @@
 // App shell: toolbar, properties bar, page sidebar, file operations and dialogs.
 import { zipSync } from 'fflate';
 import { Asset, DocStore, PageRef, chunkEvery, parseRanges, uid, Annotation } from '../core/model';
-import { blankPage, loadPdf, thumbnail } from '../core/render';
+import { blankPage, loadPdf, thumbnail, sources } from '../core/render';
 import { exportPdf } from '../core/export';
 import { platform, PickedFile } from '../platform';
 import { Viewer, Tool } from './viewer';
 import { FONT_LABEL } from '../core/fonts';
+import { documentFonts, DocFont } from '../core/docfonts';
 import { askPassword, busy, confirmBox, el, modal, toast } from './dialogs';
 import { icon } from './icons';
 import { signatureDialog } from './signature';
@@ -25,7 +26,7 @@ const TOOLS: { id: Tool; label: string; key: string; icon: string }[] = [
 const TYPE_TO_TOOL: Record<Annotation['type'], Tool | null> = {
   text: 'text', highlight: 'highlight', ink: 'pen', rect: 'rect', ellipse: 'ellipse', line: 'line', arrow: 'arrow', whiteout: 'whiteout', image: null,
 };
-type Prop = 'color' | 'width' | 'font' | 'size' | 'bold' | 'italic' | 'opacity';
+type Prop = 'color' | 'width' | 'font' | 'fontLabel' | 'size' | 'bold' | 'italic' | 'opacity';
 const PROPS_FOR: Record<string, Prop[]> = {
   text: ['color', 'font', 'size', 'bold', 'italic'], highlight: ['color', 'opacity'], pen: ['color', 'width'],
   rect: ['color', 'width', 'opacity'], ellipse: ['color', 'width', 'opacity'], line: ['color', 'width'], arrow: ['color', 'width'],
@@ -76,7 +77,24 @@ export function startApp() {
   const propbar = document.getElementById('propbar')!;
   const color = el('input', { type: 'color', class: 'color', 'aria-label': 'Colour', title: 'Colour' }) as HTMLInputElement;
   const width = el('select', { class: 'input small', 'aria-label': 'Line width', title: 'Line width' }, ...[1, 2, 3, 4, 6, 8, 12].map(w => el('option', { value: w }, `${w} pt`))) as HTMLSelectElement;
-  const font = el('select', { class: 'input small', 'aria-label': 'Font', title: 'Font' }, ...Object.entries(FONT_LABEL).map(([f, label]) => el('option', { value: f }, label))) as HTMLSelectElement;
+  const font = el('select', { class: 'input small', 'aria-label': 'Font', title: 'Font' }) as HTMLSelectElement;
+  let docFonts: DocFont[] = [], docFontsKey = '';
+  /** Built-in fonts, plus a group with the fonts already used in the open document(s). */
+  function rebuildFontList() {
+    const std = el('optgroup', { label: 'Built-in fonts' }, ...Object.entries(FONT_LABEL).map(([f, label]) => el('option', { value: f }, label)));
+    font.replaceChildren(std);
+    if (docFonts.length) {
+      font.prepend(el('optgroup', { label: 'Fonts in this document' }, ...docFonts.map(d =>
+        el('option', { value: `doc:${d.family}`, title: `Saved with the closest built-in font: ${FONT_LABEL[d.std]}` }, d.family))));
+    }
+  }
+  function updateDocFonts() {
+    const fbs = new Map(Array.from(sources.values(), s => [s.id, s.fonts] as const));
+    docFonts = documentFonts(store.pages, fbs);
+    const key = docFonts.map(d => d.family).join('|');
+    if (key !== docFontsKey) { docFontsKey = key; rebuildFontList(); }
+  }
+  rebuildFontList();
   const size = el('input', { type: 'number', class: 'input tiny-num', min: 4, max: 200, step: 1, 'aria-label': 'Font size', title: 'Font size' }) as HTMLInputElement;
   const bold = el('button', { class: 'icon-btn toggle', title: 'Bold', 'aria-label': 'Bold', 'aria-pressed': 'false', html: icon('bold', 16) }) as HTMLButtonElement;
   const italic = el('button', { class: 'icon-btn toggle', title: 'Italic', 'aria-label': 'Italic', 'aria-pressed': 'false', html: icon('italic', 16) }) as HTMLButtonElement;
@@ -118,7 +136,15 @@ export function startApp() {
   }
   color.oninput = () => setProp('color', color.value);
   width.onchange = () => setProp('width', +width.value);
-  font.onchange = () => setProp('font', font.value);
+  font.onchange = () => {
+    if (font.value.startsWith('doc:')) {
+      const d = docFonts.find(x => `doc:${x.family}` === font.value);
+      if (!d) return;
+      setProp('font', d.std); setProp('fontLabel', d.family);
+      if (d.bold) setProp('bold', true);
+      if (d.italic) setProp('italic', true);
+    } else { setProp('font', font.value); setProp('fontLabel', undefined); }
+  };
   size.onchange = () => { const v = Math.max(4, Math.min(200, +size.value || 12)); setProp('size', v); };
   size.addEventListener('keydown', e => { if (e.key === 'Enter') size.blur(); });
   bold.onclick = () => setProp('bold', bold.getAttribute('aria-pressed') !== 'true');
@@ -234,10 +260,14 @@ export function startApp() {
     const v = currentValues();
     if (v.color) color.value = v.color.length === 7 ? v.color : '#000000';
     if (v.width != null) width.value = String(v.width);
-    if (v.font) font.value = v.font;
+    if (v.font) {
+      const label = v.fontLabel && docFonts.some(d => d.family === v.fontLabel) ? `doc:${v.fontLabel}` : v.font;
+      font.value = label;
+    }
     if (v.size != null && document.activeElement !== size) size.value = String(v.size);
     bold.setAttribute('aria-pressed', String(!!v.bold)); italic.setAttribute('aria-pressed', String(!!v.italic));
     if (v.opacity != null) opacity.value = String(v.opacity);
+    updateDocFonts();
     if (store.pages !== lastPagesRef || store.pages.length !== lastLen) { lastPagesRef = store.pages; lastLen = store.pages.length; drawThumbs(); }
     if (viewer.current !== lastCurrent) { lastCurrent = viewer.current; markCurrentThumb(); }
     document.title = store.pages.length ? `${dirty ? '• ' : ''}${store.fileName} – PDF Editor` : 'PDF Editor';

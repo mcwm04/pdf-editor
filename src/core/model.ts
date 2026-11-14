@@ -7,7 +7,7 @@ export type FontName = 'Helvetica' | 'Times' | 'Courier' | 'Nastaliq' | 'Naskh';
 interface Base { id: string }
 export interface TextAnn extends Base {
   type: 'text'; x: number; y: number; w: number; h: number;
-  text: string; font: FontName; size: number; color: string; bold: boolean; italic: boolean;
+  text: string; font: FontName; fontLabel?: string; size: number; color: string; bold: boolean; italic: boolean;
 }
 export interface BoxAnn extends Base {
   type: 'highlight' | 'rect' | 'ellipse' | 'whiteout';

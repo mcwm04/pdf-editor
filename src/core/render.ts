@@ -3,10 +3,11 @@ import * as pdfjs from 'pdfjs-dist';
 import PdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?worker&inline';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { PageRef, uid, hasObjEdits } from './model';
+import { detectFonts, DocFont } from './docfonts';
 
 pdfjs.GlobalWorkerOptions.workerPort = new PdfWorker();
 
-export interface Source { id: string; name: string; bytes: Uint8Array; pdf: PDFDocumentProxy; encrypted: boolean }
+export interface Source { id: string; name: string; bytes: Uint8Array; pdf: PDFDocumentProxy; encrypted: boolean; fonts: DocFont[] }
 export const sources = new Map<string, Source>();
 
 export type AskPassword = (fileName: string, wrong: boolean) => Promise<string | null>;
@@ -26,7 +27,7 @@ export async function loadPdf(bytes: Uint8Array, name: string, askPassword: AskP
     if (e?.name === 'PasswordException' || /destroyed/i.test(e?.message || '')) throw new Error(`"${name}" needs a password`);
     throw new Error(`"${name}" is not a valid PDF (${e?.message || e})`);
   }
-  const source: Source = { id: uid('src'), name, bytes, pdf, encrypted };
+  const source: Source = { id: uid('src'), name, bytes, pdf, encrypted, fonts: encrypted ? [] : await detectFonts(bytes) };
   sources.set(source.id, source);
   const pages: PageRef[] = [];
   for (let i = 0; i < pdf.numPages; i++) {
