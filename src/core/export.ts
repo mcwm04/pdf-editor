@@ -1,7 +1,9 @@
 // pdf-lib writer: builds a new PDF from the page list and flattens annotations into it.
 import { PDFDocument, PDFFont, PDFPage, StandardFonts, rgb, degrees, BlendMode, LineCapStyle, PDFImage } from 'pdf-lib';
 import { Annotation, Asset, PageRef, TextAnn, drawOrder } from './model';
-import { sources, rasterise } from './render';
+import { sources, rasterise, setEditedPageBuilder } from './render';
+import { applyObjEdits } from './content';
+import { hasObjEdits } from './model';
 import { METRICS, effectiveFont, isUrduFont } from './fonts';
 import { UnicodeTextWriter, getHarfBuzz } from './urdu-text';
 
@@ -37,7 +39,9 @@ export async function exportPdf(pages: PageRef[], assets: Map<string, Asset>, op
     return doc;
   };
 
-  const needsUnicode = pages.some(p => p.annotations.some(a => a.type === 'text' && isUrduFont(effectiveFont(a.font, a.text))));
+  const ARABIC = /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/;
+  const needsUnicode = pages.some(p => p.annotations.some(a => a.type === 'text' && isUrduFont(effectiveFont(a.font, a.text)))
+    || Object.values(p.objEdits || {}).some(e => e.text && ARABIC.test(e.text)));
   const unicode = new UnicodeTextWriter(out, needsUnicode ? await getHarfBuzz() : null);
   const fonts = new Map<string, PDFFont>();
   const getFont = async (a: TextAnn) => {
@@ -63,6 +67,15 @@ export async function exportPdf(pages: PageRef[], assets: Map<string, Asset>, op
       const [copied] = await out.copyPages(lib, [ref.sourceIndex]);
       page = out.addPage(copied);
       const cb = page.getCropBox(); ox = cb.x; oy = cb.y;
+      if (hasObjEdits(ref)) {
+        // Edit PDF mode: rewrite the page's own content; Urdu replacements are drawn as text below.
+        const extra = await applyObjEdits(out, page, ref.objEdits!);
+        for (const x of extra) {
+          const m = METRICS.Nastaliq;
+          await unicode.draw(page, { id: '', type: 'text', x: x.x, y: x.y - x.size * m.base, w: x.w, h: x.size * m.lh, text: x.text, font: 'Nastaliq', size: x.size, color: x.color, bold: x.bold, italic: false },
+            'Nastaliq', ox, oy + ref.height, (() => { const c = hexToRgb(x.color); return [c.red, c.green, c.blue] as [number, number, number]; })());
+        }
+      }
     } else if (ref.sourceId) {
       // Fallback for files pdf-lib cannot parse (e.g. password-protected): keep the look as an image.
       page = out.addPage([ref.width, ref.height]);
@@ -139,3 +152,6 @@ export function arrowHead(x1: number, y1: number, x2: number, y2: number, width:
   const bx = x2 - len * Math.cos(ang + spread), by = y2 - len * Math.sin(ang + spread);
   return `M ${x2} ${y2} L ${ax} ${ay} L ${bx} ${by} Z`;
 }
+
+// Live preview of Edit-PDF changes: the screen renders the page from the same writer.
+setEditedPageBuilder(p => exportPdf([p], new Map()));

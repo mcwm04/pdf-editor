@@ -28,7 +28,11 @@ export interface PageRef {
   baseRotation: number;      // rotation stored in the original file
   rotation: number;          // extra rotation added by the user (0/90/180/270)
   annotations: Annotation[];
+  /** Edits to objects already in the PDF (Edit PDF mode), keyed by object id (see core/content). */
+  objEdits?: Record<string, ObjEdit>;
 }
+export interface ObjEdit { hidden?: boolean; dx?: number; dy?: number; sx?: number; sy?: number; text?: string }
+export const hasObjEdits = (p: PageRef) => !!p.objEdits && Object.keys(p.objEdits).length > 0;
 
 export interface Asset { id: string; mime: 'image/png' | 'image/jpeg'; dataUrl: string; w: number; h: number }
 

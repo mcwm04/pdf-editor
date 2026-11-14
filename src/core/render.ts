@@ -2,7 +2,7 @@
 import * as pdfjs from 'pdfjs-dist';
 import PdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?worker&inline';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
-import { PageRef, uid } from './model';
+import { PageRef, uid, hasObjEdits } from './model';
 
 pdfjs.GlobalWorkerOptions.workerPort = new PdfWorker();
 
@@ -46,6 +46,25 @@ export function blankPage(width = 595.28, height = 841.89): PageRef {
 
 const tasks = new WeakMap<HTMLCanvasElement, { cancel(): void }>();
 
+// Pages with Edit-PDF changes are rendered from a rebuilt one-page PDF, so the screen shows
+// exactly what will be saved. The builder is registered by export.ts (avoids a circular import).
+let buildEdited: ((p: PageRef) => Promise<Uint8Array>) | null = null;
+export const setEditedPageBuilder = (fn: (p: PageRef) => Promise<Uint8Array>) => { buildEdited = fn; };
+const editedDocs = new Map<string, Promise<PDFDocumentProxy>>();
+export const editsKey = (p: PageRef) => `${p.sourceId}:${p.sourceIndex}:${hasObjEdits(p) ? JSON.stringify(p.objEdits) : ''}`;
+async function pdfPageFor(page: PageRef) {
+  const src = sources.get(page.sourceId!)!;
+  if (!hasObjEdits(page) || !buildEdited || src.encrypted) return src.pdf.getPage(page.sourceIndex + 1);
+  const key = editsKey(page);
+  let doc = editedDocs.get(key);
+  if (!doc) {
+    doc = buildEdited({ ...page, annotations: [], rotation: 0 }).then(bytes => pdfjs.getDocument({ data: bytes, isEvalSupported: false }).promise);
+    editedDocs.set(key, doc);
+    if (editedDocs.size > 40) { const [k, d] = editedDocs.entries().next().value!; editedDocs.delete(k); d.then(x => x.destroy()).catch(() => {}); }
+  }
+  return (await doc).getPage(1);
+}
+
 /** Render the unrotated page into `canvas` at `scale` CSS pixels per point. */
 export async function renderPage(page: PageRef, scale: number, canvas: HTMLCanvasElement, dpr = window.devicePixelRatio || 1) {
   tasks.get(canvas)?.cancel();
@@ -56,7 +75,7 @@ export async function renderPage(page: PageRef, scale: number, canvas: HTMLCanva
     const ctx = canvas.getContext('2d')!; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
     return;
   }
-  const p = await src.pdf.getPage(page.sourceIndex + 1);
+  const p = await pdfPageFor(page);
   const vp = p.getViewport({ scale: scale * dpr, rotation: 0 });
   // Render off-screen first so the old image stays visible until the new one is ready.
   const off = document.createElement('canvas');
@@ -72,7 +91,7 @@ export async function renderPage(page: PageRef, scale: number, canvas: HTMLCanva
 const thumbCache = new Map<string, string>();
 /** Small PNG data URL of the unrotated page (cached). */
 export async function thumbnail(page: PageRef, width = 140): Promise<string> {
-  const key = `${page.sourceId}:${page.sourceIndex}:${page.width}x${page.height}`;
+  const key = `${editsKey(page)}:${page.width}x${page.height}`;
   const hit = thumbCache.get(key); if (hit) return hit;
   const c = document.createElement('canvas');
   await renderPage(page, width / page.width, c, 1);
