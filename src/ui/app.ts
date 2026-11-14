@@ -12,6 +12,7 @@ import { signatureDialog } from './signature';
 
 const TOOLS: { id: Tool; label: string; key: string; icon: string }[] = [
   { id: 'select', label: 'Select', key: 'V', icon: 'select' },
+  { id: 'edit', label: 'Edit PDF', key: 'X', icon: 'editpdf' },
   { id: 'text', label: 'Text', key: 'T', icon: 'text' },
   { id: 'highlight', label: 'Highlight', key: 'H', icon: 'highlight' },
   { id: 'pen', label: 'Draw', key: 'P', icon: 'pen' },
@@ -28,7 +29,7 @@ type Prop = 'color' | 'width' | 'font' | 'size' | 'bold' | 'italic' | 'opacity';
 const PROPS_FOR: Record<string, Prop[]> = {
   text: ['color', 'font', 'size', 'bold', 'italic'], highlight: ['color', 'opacity'], pen: ['color', 'width'],
   rect: ['color', 'width', 'opacity'], ellipse: ['color', 'width', 'opacity'], line: ['color', 'width'], arrow: ['color', 'width'],
-  whiteout: ['color'], select: [], image: [],
+  whiteout: ['color'], select: [], image: [], edit: [],
 };
 
 export function startApp() {
@@ -49,6 +50,7 @@ export function startApp() {
   const toolGroup = el('div', { class: 'group tools', role: 'toolbar', 'aria-label': 'Tools' });
   for (const t of TOOLS) {
     const b = el('button', { class: 'tool-btn', title: `${t.label} (${t.key})`, 'aria-label': t.label, 'aria-pressed': 'false', html: `${icon(t.icon)}<span>${t.label}</span>`, onclick: () => viewer.setTool(t.id) }) as HTMLButtonElement;
+    if (t.id === 'edit') b.classList.add('edit-pdf');
     toolBtns.set(t.id, b); toolGroup.append(b);
   }
   toolGroup.append(
@@ -81,17 +83,19 @@ export function startApp() {
   const opacity = el('input', { type: 'range', min: 0.1, max: 1, step: 0.05, class: 'range', 'aria-label': 'Opacity', title: 'Opacity' }) as HTMLInputElement;
   const swatches = el('div', { class: 'swatches' }, ...['#111827', '#dc2626', '#2563eb', '#16a34a', '#f59e0b', '#fde047', '#ffffff'].map(c =>
     el('button', { class: 'swatch', style: `background:${c}`, title: c, 'aria-label': `Colour ${c}`, onmousedown: (e: Event) => e.preventDefault(), onclick: () => setProp('color', c) })));
-  const deleteBtn = el('button', { class: 'btn small danger-ghost', html: `${icon('trash', 15)}<span>Delete</span>`, onclick: () => viewer.deleteSelected() });
+  const deleteBtn = el('button', { class: 'btn small danger-ghost', html: `${icon('trash', 15)}<span>Delete</span>`, onclick: () => (viewer.tool === 'edit' ? viewer.edit.deleteSelected() : viewer.deleteSelected()) });
+  const editTextBtn = el('button', { class: 'btn small', html: `${icon('text', 15)}<span>Change text</span>`, onclick: () => viewer.edit.editSelectedText() });
   const ctxLabel = el('span', { class: 'ctx-label' });
   const hint = el('span', { class: 'hint' });
   const wrapProp = (p: Prop, ...nodes: Node[]) => el('label', { class: 'prop', 'data-prop': p }, ...nodes);
   propbar.append(ctxLabel,
     wrapProp('color', color, swatches), wrapProp('font', font), wrapProp('size', size), wrapProp('bold', bold, italic),
     wrapProp('width', width), wrapProp('opacity', el('span', { class: 'muted' }, 'Opacity'), opacity),
-    deleteBtn, el('div', { class: 'spacer' }), hint);
+    editTextBtn, deleteBtn, el('div', { class: 'spacer' }), hint);
   for (const b of [bold, italic]) b.addEventListener('mousedown', e => e.preventDefault()); // keep the text editor focused
 
   const contextKind = (): string => {
+    if (viewer.tool === 'edit') return 'edit';
     if (viewer.editing) return 'text';
     const sel = viewer.selected();
     if (sel) return sel.type === 'ink' ? 'pen' : sel.type;
@@ -129,6 +133,7 @@ export function startApp() {
     rect: 'Drag to draw. Hold Shift for a square.', ellipse: 'Drag to draw. Hold Shift for a circle.',
     line: 'Drag to draw. Hold Shift to snap to 45°.', arrow: 'Drag to draw. Hold Shift to snap to 45°.',
     whiteout: 'Drag to cover content with a white box. Then use Text to type over it.',
+    edit: 'Click text, images or shapes that are already in the PDF. Drag to move, double-click text to change it, Delete to remove.',
   };
 
   // ---------- sidebar ----------
@@ -212,9 +217,20 @@ export function startApp() {
     const sel = viewer.selected();
     propbar.querySelectorAll<HTMLElement>('.prop').forEach(p => { p.style.display = props.includes(p.dataset.prop as Prop) ? '' : 'none'; });
     deleteBtn.style.display = sel && !viewer.editing ? '' : 'none';
+    editTextBtn.style.display = 'none';
     const nameOf: Record<string, string> = { ink: 'Drawing', pen: 'Draw', rect: 'Rectangle', image: 'Image', whiteout: 'Whiteout' };
     ctxLabel.textContent = sel && !viewer.editing ? `Selected: ${nameOf[sel.type] || sel.type[0].toUpperCase() + sel.type.slice(1)}` : (TOOLS.find(t => t.id === viewer.tool)?.label || '');
     hint.textContent = store.pages.length ? (sel && !viewer.editing ? 'Delete key removes it. Arrow keys nudge it.' : HINTS[viewer.tool] || '') : '';
+    if (viewer.tool === 'edit') {
+      const es = viewer.edit.selected();
+      deleteBtn.style.display = es && !viewer.edit.editing ? '' : 'none';
+      editTextBtn.style.display = es?.o.kind === 'text' && !viewer.edit.editing ? '' : 'none';
+      if (es) {
+        const f = es.o.font;
+        ctxLabel.textContent = es.o.kind === 'text' ? `Selected: Text · ${f?.baseFont || 'unknown font'} ${Math.round((es.o.size ?? 0) * 10) / 10} pt` : `Selected: ${es.o.label}`;
+        hint.textContent = es.o.kind === 'text' ? 'Drag to move. Double-click or Enter to change the words. Delete removes it from the PDF.' : 'Drag to move, drag the corner to resize (Shift keeps the shape). Delete removes it from the PDF.';
+      } else ctxLabel.textContent = 'Edit PDF';
+    }
     const v = currentValues();
     if (v.color) color.value = v.color.length === 7 ? v.color : '#000000';
     if (v.width != null) width.value = String(v.width);
@@ -451,6 +467,15 @@ export function startApp() {
     if (mod && k === '-') { e.preventDefault(); viewer.setZoom(viewer.zoom / 1.2); return; }
     if (mod && k === '0') { e.preventDefault(); viewer.fitWidth(); return; }
     if (mod) return;
+    if (viewer.tool === 'edit' && viewer.edit.sel) {
+      if (k === 'delete' || k === 'backspace') { e.preventDefault(); viewer.edit.deleteSelected(); return; }
+      if (k === 'enter') { e.preventDefault(); viewer.edit.editSelectedText(); return; }
+      if (k === 'escape') { viewer.edit.select(null); return; }
+      if (k.startsWith('arrow')) {
+        e.preventDefault(); const d = e.shiftKey ? 10 : 1;
+        viewer.edit.nudge(k === 'arrowleft' ? -d : k === 'arrowright' ? d : 0, k === 'arrowup' ? -d : k === 'arrowdown' ? d : 0); return;
+      }
+    }
     if ((k === 'delete' || k === 'backspace') && viewer.selectedId) { e.preventDefault(); viewer.deleteSelected(); return; }
     if (k === 'escape') { viewer.setTool('select'); viewer.select(null); return; }
     if (viewer.selectedId && k.startsWith('arrow')) {

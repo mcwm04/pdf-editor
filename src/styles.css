@@ -136,3 +136,12 @@ p { margin: 0; line-height: 1.5; }
 
 @media (max-width: 1100px) { .tool-btn span { display: none; } .tool-btn { min-width: 36px; padding: 8px; } }
 @media (max-width: 760px) { .sidebar { display: none; } .brand span:last-child { display: none; } .hint { display: none; } }
+
+/* Edit PDF mode */
+.viewer[data-tool="edit"] .ann { pointer-events: none; opacity: .55; }
+.viewer[data-tool="edit"] .overlay { cursor: default; }
+.edit-hover { fill: rgb(79 70 229 / .06); stroke: var(--accent); stroke-dasharray: 4 3; pointer-events: none; }
+.edit-sel { fill: none; stroke: var(--accent); pointer-events: none; }
+.edit-lift { fill: #fff; fill-opacity: .85; pointer-events: none; }
+.obj-text-editor { display: block; box-sizing: border-box; border: 1.5px solid var(--accent); background: #fff; padding: 2px; margin: 0; outline: none; border-radius: 2px; box-shadow: 0 2px 10px rgb(0 0 0 / .15); }
+.tool-btn.edit-pdf.active { background: #fef3c7; color: #92400e; }

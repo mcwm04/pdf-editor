@@ -1,18 +1,20 @@
 // Page viewer + edit layer. Pages are canvases (PDF.js); edits are drawn in an SVG overlay
 // whose user space is the page's unrotated point space, so zoom and rotation never touch the model.
 import { drawOrder, Annotation, Asset, DocStore, PageRef, TextAnn, BoxAnn, LineAnn, InkAnn, ImageAnn, FontName, annBounds, moveAnn, resizeAnn, uid } from '../core/model';
-import { renderPage } from '../core/render';
+import { renderPage, editsKey } from '../core/render';
+import { EditMode } from './editmode';
 import { arrowHead } from '../core/export';
 import { FONT_CSS, METRICS, effectiveFont, isUrduFont, isRtlText, hasArabicScript } from '../core/fonts';
 export { FONT_CSS };
 
-export type Tool = 'select' | 'text' | 'highlight' | 'pen' | 'rect' | 'ellipse' | 'line' | 'arrow' | 'whiteout';
+export type Tool = 'select' | 'edit' | 'text' | 'highlight' | 'pen' | 'rect' | 'ellipse' | 'line' | 'arrow' | 'whiteout';
 export interface Style { color: string; width: number; size: number; font: FontName; bold: boolean; italic: boolean; opacity: number }
 
 
 const base: Style = { color: '#1f2937', width: 2, size: 14, font: 'Helvetica', bold: false, italic: false, opacity: 1 };
 export const defaultStyles = (): Record<Tool, Style> => ({
   select: { ...base },
+  edit: { ...base },
   text: { ...base, color: '#111827' },
   highlight: { ...base, color: '#fde047', opacity: 0.45 },
   pen: { ...base, color: '#dc2626', width: 2 },
@@ -40,13 +42,14 @@ export function measureText(a: Pick<TextAnn, 'text' | 'font' | 'size' | 'bold' |
   return { w: Math.ceil(w + 1), h: lines.length * a.size * METRICS[font].lh };
 }
 
-class PageView {
+export class PageView {
   wrap = document.createElement('div');
   inner = document.createElement('div');
   canvas = document.createElement('canvas');
   svg = s('svg');
   annLayer = s('g');
   uiLayer = s('g');
+  editLayer = s('g');
   label = document.createElement('div');
   renderedKey = '';
   visible = false;
@@ -55,7 +58,7 @@ class PageView {
     this.inner.className = 'page';
     this.label.className = 'page-label';
     this.svg.setAttribute('class', 'overlay');
-    this.svg.append(this.annLayer, this.uiLayer);
+    this.svg.append(this.annLayer, this.uiLayer, this.editLayer);
     this.inner.append(this.canvas, this.svg);
     this.wrap.append(this.inner, this.label);
     this.wrap.dataset.pageId = page.id;
@@ -78,6 +81,10 @@ export class Viewer {
   onChange: () => void = () => {};
 
   private views = new Map<string, PageView>();
+  edit = new EditMode(this);
+  pageViews() { return [...this.views.values()]; }
+  viewFor(pageId: string) { return this.views.get(pageId); }
+  pagePoint(e: { clientX: number; clientY: number }, v: PageView) { return this.pt(e, v); }
   private pagesEl: HTMLElement;
   private observer: IntersectionObserver;
   private drag: Drag | null = null;
@@ -100,9 +107,9 @@ export class Viewer {
       if (ticking) return; ticking = true;
       requestAnimationFrame(() => { ticking = false; this.updateCurrent(); });
     });
-    window.addEventListener('pointermove', e => this.onMove(e));
-    window.addEventListener('pointerup', e => this.onUp(e));
-    window.addEventListener('pointercancel', e => this.onUp(e));
+    window.addEventListener('pointermove', e => { this.onMove(e); this.edit.onMove(e); });
+    window.addEventListener('pointerup', e => { this.onUp(e); this.edit.onUp(); });
+    window.addEventListener('pointercancel', e => { this.onUp(e); this.edit.onUp(); });
     root.addEventListener('wheel', e => {
       if (!e.ctrlKey) return;
       e.preventDefault();
@@ -120,7 +127,9 @@ export class Viewer {
       if (!v) {
         v = new PageView(page);
         v.svg.addEventListener('pointerdown', e => this.onDown(e, v!));
-        v.svg.addEventListener('dblclick', e => this.onDouble(e, v!));
+        v.svg.addEventListener('dblclick', e => (this.tool === 'edit' ? this.edit.onDouble(e, v!) : this.onDouble(e, v!)));
+        v.svg.addEventListener('pointermove', e => { if (this.tool === 'edit') this.edit.onHover(e, v!); });
+        v.svg.addEventListener('pointerleave', () => this.edit.onLeave(v!));
         this.views.set(page.id, v);
         this.observer.observe(v.wrap);
       }
@@ -129,6 +138,7 @@ export class Viewer {
       if (this.pagesEl.children[i] !== v.wrap) this.pagesEl.insertBefore(v.wrap, this.pagesEl.children[i] || null);
       this.layout(v);
       this.drawOverlay(v);
+      this.edit.draw(v);
       if (v.visible) this.paint(v);
     });
     if (this.selectedId && !this.store.findAnn(this.selectedId)) this.selectedId = null;
@@ -150,7 +160,7 @@ export class Viewer {
   }
 
   private async paint(v: PageView) {
-    const key = `${this.zoom}:${v.page.sourceId}:${v.page.sourceIndex}`;
+    const key = `${this.zoom}:${editsKey(v.page)}`;
     if (v.renderedKey === key) return;
     v.renderedKey = key;
     try { await renderPage(v.page, this.zoom, v.canvas); }
@@ -269,6 +279,13 @@ export class Viewer {
     if (e.button !== 0) return;
     const target = e.target as Element;
     if (this.editor && this.editor.fo.contains(target)) return; // typing inside the editor
+    if (this.tool === 'edit') {
+      if (this.editor) this.commitText();
+      this.current = this.store.pages.findIndex(pg => pg.id === v.page.id);
+      if (!this.edit.editing || !(target as Element).closest?.('foreignObject')) e.preventDefault();
+      this.edit.onDown(e, v);
+      return;
+    }
     const p = this.pt(e, v);
     const annEl = target.closest('[data-id]') as SVGGElement | null;
     const annId = annEl?.dataset.id ?? null;
@@ -511,8 +528,10 @@ export class Viewer {
   }
   setTool(t: Tool) {
     if (this.editor) this.commitText();
+    if (this.tool === 'edit' && t !== 'edit') this.edit.clear();
     this.tool = t;
     this.root.dataset.tool = t;
+    if (t === 'edit') this.edit.redrawAll();
     if (t !== 'select') this.select(null); else this.onChange();
   }
 }

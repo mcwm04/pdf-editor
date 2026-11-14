@@ -29,6 +29,7 @@ const P: Record<string, string> = {
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
   up: '<path d="m18 15-6-6-6 6"/>',
   down: '<path d="m6 9 6 6 6-6"/>',
+  editpdf: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4"/><path d="M14 3v5h5"/><path d="M19.4 12.6a1.9 1.9 0 0 1 2.7 2.7L16 21.4l-3.5.9.9-3.5z"/>',
   file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
 };
 export const icon = (name: string, size = 18) =>
