@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PDF Editor</title>
+  <meta name="description" content="Edit PDFs privately in your browser: add text, highlight, draw, sign, and merge, split, rotate or reorder pages." />
+</head>
+<body>
+  <div id="app">
+    <header class="topbar" id="topbar"></header>
+    <div class="propbar" id="propbar"></div>
+    <div class="main">
+      <aside class="sidebar" id="sidebar" aria-label="Pages"></aside>
+      <section class="viewer" id="viewer" data-tool="select">
+        <div id="pages"></div>
+        <div class="empty" id="empty"></div>
+      </section>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

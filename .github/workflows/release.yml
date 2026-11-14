@@ -1,0 +1,30 @@
+# Builds the web app and desktop installers for Windows, macOS and Linux.
+# Push a tag like v1.0.0 to create a release with all installers attached.
+name: release
+on:
+  push: { tags: ['v*'] }
+  workflow_dispatch:
+jobs:
+  desktop:
+    strategy:
+      matrix: { os: [windows-latest, macos-latest, ubuntu-latest] }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+      - run: npm run build
+      - run: npm ci
+        working-directory: desktop
+      - run: npm run dist
+        working-directory: desktop
+        env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.os }}
+          path: |
+            desktop/dist/*.exe
+            desktop/dist/*.dmg
+            desktop/dist/*.AppImage
+            desktop/dist/*.deb

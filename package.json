@@ -1,0 +1,29 @@
+{
+  "name": "pdf-editor",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node scripts/escape-replacement-char.js",
+    "preview": "vite preview",
+    "desktop": "npm run build && cd desktop && npm start"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^5.4.21",
+    "vite-plugin-singlefile": "^2.3.4"
+  },
+  "dependencies": {
+    "@pdf-lib/fontkit": "^1.1.1",
+    "bidi-js": "^1.1.0",
+    "fflate": "^0.8.3",
+    "harfbuzzjs": "^1.6.4",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^4.10.38"
+  },
+  "type": "module"
+}
